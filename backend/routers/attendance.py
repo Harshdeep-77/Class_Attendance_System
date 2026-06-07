@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Student, AttendanceRecord
 from face_utils import encode_face_from_bytes, find_match
 from datetime import date
+import openpyxl
+import io
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
@@ -102,3 +104,32 @@ def get_attendance_report(date_str: str, period: int, db: Session = Depends(get_
             "marked_at": str(r.marked_at)
         })
     return result
+
+
+@router.get("/report/{date_str}/{period}/download")
+def download_attendance_report(date_str: str, period: int, db: Session = Depends(get_db)):
+    """Download attendance report as Excel."""
+    records = db.query(AttendanceRecord).filter(
+        AttendanceRecord.date == date_str,
+        AttendanceRecord.period == period
+    ).all()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Report {date_str} P{period}"
+    
+    ws.append(["Name", "Roll No", "Marked At", "Status"])
+    
+    for r in records:
+        student = db.query(Student).filter(Student.id == r.student_id).first()
+        if student:
+            ws.append([student.name, student.roll_no, str(r.marked_at), "Present"])
+            
+    stream = io.BytesIO()
+    wb.save(stream)
+        
+    return Response(
+        content=stream.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=attendance_report_{date_str}_p{period}.xlsx"}
+    )

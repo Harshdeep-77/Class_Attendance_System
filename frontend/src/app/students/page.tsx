@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllStudents, getStudentPhotoUrl } from "@/lib/api";
+import { getAllStudents, getStudentPhotoUrl, API_BASE } from "@/lib/api";
 import type { Student } from "@/lib/types";
 
 export default function StudentsPage() {
@@ -28,9 +28,20 @@ export default function StudentsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            <span className="gradient-text">All Students</span>
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight">
+              <span className="gradient-text">All Students</span>
+            </h1>
+            <a
+              href={`${API_BASE}/students/download`}
+              className="px-3 py-1.5 rounded-lg bg-success/10 text-success text-sm font-medium hover:bg-success/20 transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download Excel
+            </a>
+          </div>
           <p className="text-muted mt-1">
             {students.length} registered student{students.length !== 1 && "s"}
           </p>

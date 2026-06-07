@@ -22,10 +22,9 @@ You will need to run both the backend and the frontend servers simultaneously in
    .\venv\Scripts\activate
    ```
    *(If you are on macOS/Linux, use `source venv/bin/activate` instead)*
-3. If you haven't already, install any required dependencies:
+3. If you haven't already, install the required dependencies:
    ```bash
-   pip install fastapi uvicorn sqlalchemy
-   # You might also need other packages like opencv-python or face-recognition depending on your setup
+   pip install -r requirements.txt
    ```
 4. Start the FastAPI development server:
    ```bash

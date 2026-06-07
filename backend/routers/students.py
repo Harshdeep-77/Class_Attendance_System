@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Student
 from face_utils import encode_face_from_bytes, average_encodings, encoding_to_db
 import shutil, os
+import openpyxl
+import io
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
@@ -79,3 +82,25 @@ def get_all_students(db: Session = Depends(get_db)):
         {"id": s.id, "name": s.name, "roll_no": s.roll_no, "branch": s.branch}
         for s in students
     ]
+
+
+@router.get("/download")
+def download_students(db: Session = Depends(get_db)):
+    students = db.query(Student).all()
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Students"
+    
+    ws.append(["ID", "Name", "Roll No", "Branch"])
+    for s in students:
+        ws.append([s.id, s.name, s.roll_no, s.branch])
+        
+    stream = io.BytesIO()
+    wb.save(stream)
+        
+    return Response(
+        content=stream.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=students_list.xlsx"}
+    )

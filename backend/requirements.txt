@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+numpy
+deepface
+pillow
+opencv-python
+python-multipart
+tf-keras
+openpyxl

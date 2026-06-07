@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { getAttendanceReport } from "@/lib/api";
+import { getAttendanceReport, API_BASE } from "@/lib/api";
 import type { AttendanceRecord } from "@/lib/types";
 
 export default function ReportPage() {
@@ -102,11 +102,22 @@ export default function ReportPage() {
           ) : (
             <div className="glass-card overflow-hidden">
               {/* Summary bar */}
-              <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-                <h3 className="font-semibold">
-                  {date} — Period {period}
-                </h3>
-                <span className="px-3 py-1 rounded-full bg-success/10 text-success text-sm font-medium">
+              <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <h3 className="font-semibold">
+                    {date} — Period {period}
+                  </h3>
+                  <a
+                    href={`${API_BASE}/attendance/report/${date}/${period}/download`}
+                    className="px-3 py-1.5 rounded-lg bg-success/10 text-success text-sm font-medium hover:bg-success/20 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download Excel
+                  </a>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-success/10 text-success text-sm font-medium text-center w-full sm:w-auto">
                   {records.length} Present
                 </span>
               </div>

@@ -20,7 +20,7 @@ export default function StudentsPage() {
     (s) =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.roll_no.toLowerCase().includes(search.toLowerCase()) ||
-      s.branch.toLowerCase().includes(search.toLowerCase())
+      s.branch_name.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -123,8 +123,9 @@ export default function StudentsPage() {
                   <h3 className="font-semibold truncate">{student.name}</h3>
                   <p className="text-sm text-muted truncate">{student.roll_no}</p>
                   <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-accent/10 text-accent text-xs font-medium">
-                    {student.branch}
+                    {student.branch_name}
                   </span>
+                  <p className="text-sm text-muted truncate">{student.semester} Sem</p>
                 </div>
               </div>
             </div>

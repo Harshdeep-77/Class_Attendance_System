@@ -1,13 +1,20 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { registerStudent } from "@/lib/api";
+import { registerStudent, getBranches } from "@/lib/api";
+import type { Branch } from "@/lib/types";
 import { showToast } from "@/components/Toast";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [rollNo, setRollNo] = useState("");
-  const [branch, setBranch] = useState("");
+  const [branchId, setBranchId] = useState<number | "">("");
+  const [semester, setSemester] = useState<number | "">("");
+  const [branches, setBranches] = useState<Branch[]>([]);
+
+  useEffect(() => {
+    getBranches().then(setBranches).catch(console.error);
+  }, []);
   const [photos, setPhotos] = useState<(File | null)[]>([null, null, null, null]);
   const [previews, setPreviews] = useState<(string | null)[]>([null, null, null, null]);
   const [loading, setLoading] = useState(false);
@@ -94,18 +101,19 @@ export default function RegisterPage() {
       showToast("Please provide all 4 face photos", "error");
       return;
     }
-    if (!name || !rollNo || !branch) {
+    if (!name || !rollNo || branchId === "" || semester === "") {
       showToast("Please fill all fields", "error");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await registerStudent({ name, roll_no: rollNo, branch }, validPhotos);
+      const res = await registerStudent({ name, roll_no: rollNo, branch_id: Number(branchId), semester: Number(semester) }, validPhotos);
       showToast(res.message, "success");
       setName("");
       setRollNo("");
-      setBranch("");
+      setBranchId("");
+      setSemester("");
       setPhotos([null, null, null, null]);
       setPreviews([null, null, null, null]);
     } catch (err: unknown) {
@@ -164,15 +172,37 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className="block text-sm text-muted mb-1.5">Branch</label>
-              <input
-                type="text"
+              <select
                 className="input"
-                placeholder="e.g. Computer Science"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
+                value={branchId}
+                onChange={(e) => {
+                  setBranchId(e.target.value === "" ? "" : Number(e.target.value));
+                  setSemester("");
+                }}
                 required
-              />
+              >
+                <option value="">-- Select Branch --</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
             </div>
+            {branchId !== "" && (
+              <div>
+                <label className="block text-sm text-muted mb-1.5">Semester</label>
+                <select
+                  className="input"
+                  value={semester}
+                  onChange={(e) => setSemester(e.target.value === "" ? "" : Number(e.target.value))}
+                  required
+                >
+                  <option value="">-- Select Semester --</option>
+                  {Array.from({ length: branches.find(b => b.id === Number(branchId))?.total_semesters || 0 }, (_, i) => i + 1).map((s) => (
+                    <option key={s} value={s}>Semester {s}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 

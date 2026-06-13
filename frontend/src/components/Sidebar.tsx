@@ -49,6 +49,15 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: "/admin/academic",
+    label: "Academic",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar() {
@@ -80,8 +89,8 @@ export default function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
-                    ? "bg-accent/10 text-accent border border-accent/20 shadow-sm"
-                    : "text-muted hover:text-foreground hover:bg-surface-light"
+                  ? "bg-accent/10 text-accent border border-accent/20 shadow-sm"
+                  : "text-muted hover:text-foreground hover:bg-surface-light"
                   }`}
               >
                 {item.icon}
@@ -104,8 +113,8 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl text-xs transition-all ${isActive
-                  ? "text-accent"
-                  : "text-muted hover:text-foreground"
+                ? "text-accent"
+                : "text-muted hover:text-foreground"
                 }`}
             >
               {item.icon}

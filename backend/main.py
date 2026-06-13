@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine
 import models
-from routers import students, attendance
+from routers import students, attendance, academic
 
 # Create all DB tables on startup
 models.Base.metadata.create_all(bind=engine)
@@ -16,6 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(academic.router)
 app.include_router(students.router)
 app.include_router(attendance.router)
 

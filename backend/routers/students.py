@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from pydantic import BaseModel
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Student
+from models import Student, Branch
 from face_utils import encode_face_from_bytes, average_encodings, encoding_to_db
 import shutil, os
 import openpyxl
@@ -18,7 +19,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def register_student(
     name: str = Form(...),
     roll_no: str = Form(...),
-    branch: str = Form(...),
+    branch_id: int = Form(...),
+    semester: int = Form(...),
     photo1: UploadFile = File(..., description="Face photo 1"),
     photo2: UploadFile = File(..., description="Face photo 2"),
     photo3: UploadFile = File(..., description="Face photo 3"),
@@ -59,7 +61,8 @@ async def register_student(
     student = Student(
         name=name,
         roll_no=roll_no,
-        branch=branch,
+        branch_id=branch_id,
+        semester=semester,
         photo_path=photo_path,
         face_encoding=encoding_to_db(final_encoding)
     )
@@ -77,11 +80,43 @@ async def register_student(
 
 @router.get("/")
 def get_all_students(db: Session = Depends(get_db)):
-    students = db.query(Student).all()
+    students = db.query(Student, Branch).outerjoin(Branch, Student.branch_id == Branch.id).all()
     return [
-        {"id": s.id, "name": s.name, "roll_no": s.roll_no, "branch": s.branch}
+        {
+            "id": s.Student.id, 
+            "name": s.Student.name, 
+            "roll_no": s.Student.roll_no, 
+            "branch_id": s.Student.branch_id,
+            "branch_name": s.Branch.name if s.Branch else "Unknown",
+            "semester": s.Student.semester
+        }
         for s in students
     ]
+
+class StudentLogin(BaseModel):
+    name: str
+    roll_no: str
+
+@router.post("/login")
+def student_login(data: StudentLogin, db: Session = Depends(get_db)):
+    student = db.query(Student).filter(
+        Student.name == data.name,
+        Student.roll_no == data.roll_no
+    ).first()
+    
+    if not student:
+        raise HTTPException(status_code=401, detail="Invalid Name or Roll Number")
+        
+    return {
+        "message": "Login successful",
+        "student": {
+            "id": student.id,
+            "name": student.name,
+            "roll_no": student.roll_no,
+            "branch_id": student.branch_id,
+            "semester": student.semester
+        }
+    }
 
 
 @router.get("/download")
@@ -92,9 +127,9 @@ def download_students(db: Session = Depends(get_db)):
     ws = wb.active
     ws.title = "Students"
     
-    ws.append(["ID", "Name", "Roll No", "Branch"])
+    ws.append(["ID", "Name", "Roll No", "Branch ID", "Semester"])
     for s in students:
-        ws.append([s.id, s.name, s.roll_no, s.branch])
+        ws.append([s.id, s.name, s.roll_no, s.branch_id, s.semester])
         
     stream = io.BytesIO()
     wb.save(stream)

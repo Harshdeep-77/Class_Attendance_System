@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import Webcam from "@/components/Webcam";
-import { recognizeFace, getStudentPhotoUrl } from "@/lib/api";
-import type { RecognitionResult } from "@/lib/types";
+import { recognizeFace, getStudentPhotoUrl, getBranches, getSubjects } from "@/lib/api";
+import type { RecognitionResult, Branch, Subject } from "@/lib/types";
+import { showToast } from "@/components/Toast";
 
 interface SessionEntry {
   id: number;
@@ -19,12 +20,32 @@ export default function RecognizePage() {
   const [sessionLog, setSessionLog] = useState<SessionEntry[]>([]);
   const counterRef = useRef(0);
 
+  // New states for academic filters
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [branchId, setBranchId] = useState<number | "">("");
+  const [semester, setSemester] = useState<number | "">("");
+  const [subjectId, setSubjectId] = useState<number | "">("");
+
+  useEffect(() => {
+    getBranches().then(setBranches).catch(console.error);
+  }, []);
+
+  // Fetch subjects when branch or semester changes
+  useEffect(() => {
+    if (branchId !== "" && semester !== "") {
+      getSubjects(Number(branchId), Number(semester)).then(setSubjects).catch(console.error);
+    } else {
+      setSubjects([]);
+    }
+  }, [branchId, semester]);
+
   const handleFrame = useCallback(
     async (blob: Blob) => {
-      if (processing) return;
+      if (processing || subjectId === "") return;
       setProcessing(true);
       try {
-        const result = await recognizeFace(blob, period);
+        const result = await recognizeFace(blob, period, Number(subjectId));
         setLastResult(result);
         if (result.matched && !result.already_marked) {
           counterRef.current += 1;
@@ -43,7 +64,7 @@ export default function RecognizePage() {
         setProcessing(false);
       }
     },
-    [period, processing]
+    [period, processing, subjectId]
   );
 
   const statusColor = !lastResult
@@ -66,44 +87,102 @@ export default function RecognizePage() {
             Face recognition powered by ArcFace AI
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Period Selector */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-muted">Period:</label>
-            <select
-              className="input w-20"
-              value={period}
-              onChange={(e) => setPeriod(Number(e.target.value))}
-            >
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
+      </div>
 
+      {/* Class Selection */}
+      <div className="glass-card p-4 animate-fade-in flex flex-wrap items-end gap-4">
+        <div className="flex-1 min-w-[150px]">
+          <label className="block text-sm text-muted mb-1.5">Branch</label>
+          <select
+            className="input"
+            value={branchId}
+            onChange={(e) => {
+              setBranchId(e.target.value === "" ? "" : Number(e.target.value));
+              setSemester("");
+              setSubjectId("");
+            }}
+            disabled={isActive}
+          >
+            <option value="">-- Select Branch --</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex-1 min-w-[150px]">
+          <label className="block text-sm text-muted mb-1.5">Semester</label>
+          <select
+            className="input"
+            value={semester}
+            onChange={(e) => {
+              setSemester(e.target.value === "" ? "" : Number(e.target.value));
+              setSubjectId("");
+            }}
+            disabled={isActive || branchId === ""}
+          >
+            <option value="">-- Select Semester --</option>
+            {Array.from({ length: branches.find(b => b.id === Number(branchId))?.total_semesters || 0 }, (_, i) => i + 1).map((s) => (
+              <option key={s} value={s}>Semester {s}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex-1 min-w-[150px]">
+          <label className="block text-sm text-muted mb-1.5">Subject</label>
+          <select
+            className="input"
+            value={subjectId}
+            onChange={(e) => setSubjectId(e.target.value === "" ? "" : Number(e.target.value))}
+            disabled={isActive || semester === ""}
+          >
+            <option value="">-- Select Subject --</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="w-24">
+          <label className="block text-sm text-muted mb-1.5">Period</label>
+          <select
+            className="input"
+            value={period}
+            onChange={(e) => setPeriod(Number(e.target.value))}
+            disabled={isActive}
+          >
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="pt-2">
           {/* Start / Stop */}
           <button
-            className={isActive ? "btn-secondary border-danger text-danger" : "btn-primary"}
+            className={isActive ? "btn-secondary border-danger text-danger w-full sm:w-auto" : "btn-primary w-full sm:w-auto"}
             onClick={() => {
+              if (!isActive && subjectId === "") {
+                showToast("Please select Branch, Semester, and Subject first", "error");
+                return;
+              }
               setIsActive(!isActive);
               if (isActive) setLastResult(null);
             }}
           >
             {isActive ? (
-              <span className="flex items-center gap-2">
+              <span className="flex items-center justify-center gap-2">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <rect x="6" y="6" width="12" height="12" rx="2" />
                 </svg>
                 Stop
               </span>
             ) : (
-              <span className="flex items-center gap-2">
+              <span className="flex items-center justify-center gap-2">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
                 </svg>
-                Start
+                Start Camera
               </span>
             )}
           </button>
@@ -128,8 +207,8 @@ export default function RecognizePage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <p className="text-muted text-sm">
-                  Click <strong>Start</strong> to begin face recognition
+                <p className="text-muted text-sm text-center px-4">
+                  Select your class details and click <strong>Start Camera</strong> to begin tracking
                 </p>
               </div>
             )}
@@ -180,7 +259,6 @@ export default function RecognizePage() {
                 <div>
                   <h4 className="text-lg font-bold">{lastResult.student.name}</h4>
                   <p className="text-sm text-muted">{lastResult.student.roll_no}</p>
-                  <p className="text-xs text-muted">{lastResult.student.branch}</p>
                 </div>
                 <div className="flex items-center justify-center gap-2">
                   <span className="text-xs font-medium px-2 py-1 rounded-full bg-success/10 text-success">

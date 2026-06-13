@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Student, AttendanceRecord
+from models import Student, AttendanceRecord, Subject, Branch
 from face_utils import encode_face_from_bytes, find_match
 from datetime import date
 import openpyxl
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/attendance", tags=["Attendance"])
 @router.post("/recognize")
 async def recognize_student(
     period: int,
+    subject_id: int,
     photo: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
@@ -35,12 +36,20 @@ async def recognize_student(
     if matched_student is None:
         return {"matched": False, "reason": "Face not recognized"}
 
-    # Step 3: Check if attendance already marked today for this period
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        return {"matched": False, "reason": "Invalid Subject"}
+
+    if matched_student.branch_id != subject.branch_id or matched_student.semester != subject.semester:
+        return {"matched": False, "reason": "Student does not belong to this branch and semester"}
+
+    # Step 3: Check if attendance already marked today for this period and subject
     today = str(date.today())
     already_marked = db.query(AttendanceRecord).filter(
         AttendanceRecord.student_id == matched_student.id,
         AttendanceRecord.date == today,
-        AttendanceRecord.period == period
+        AttendanceRecord.period == period,
+        AttendanceRecord.subject_id == subject_id
     ).first()
 
     if already_marked:
@@ -51,13 +60,14 @@ async def recognize_student(
             "student": {
                 "name": matched_student.name,
                 "roll_no": matched_student.roll_no,
-                "branch": matched_student.branch,
+                "branch_id": matched_student.branch_id,
                 "photo_url": f"/students/photo/{matched_student.roll_no}"
             }
         }
     # Step 4: Mark attendance
     record = AttendanceRecord(
         student_id=matched_student.id,
+        subject_id=subject_id,
         date=today,
         period=period,
         status="present"
@@ -72,7 +82,7 @@ async def recognize_student(
         "student": {
             "name": matched_student.name,
             "roll_no": matched_student.roll_no,
-            "branch": matched_student.branch,
+            "branch_id": matched_student.branch_id,
             "photo_url": f"/students/photo/{matched_student.roll_no}"
         }
     }
@@ -87,12 +97,13 @@ def get_student_photo(roll_no: str, db: Session = Depends(get_db)):
     return FileResponse(student.photo_path)
 
 
-@router.get("/report/{date_str}/{period}")
-def get_attendance_report(date_str: str, period: int, db: Session = Depends(get_db)):
-    """Get all present students for a specific date and period."""
+@router.get("/report/{date_str}/{period}/{subject_id}")
+def get_attendance_report(date_str: str, period: int, subject_id: int, db: Session = Depends(get_db)):
+    """Get all present students for a specific date, period, and subject."""
     records = db.query(AttendanceRecord).filter(
         AttendanceRecord.date == date_str,
-        AttendanceRecord.period == period
+        AttendanceRecord.period == period,
+        AttendanceRecord.subject_id == subject_id
     ).all()
 
     result = []
@@ -106,12 +117,13 @@ def get_attendance_report(date_str: str, period: int, db: Session = Depends(get_
     return result
 
 
-@router.get("/report/{date_str}/{period}/download")
-def download_attendance_report(date_str: str, period: int, db: Session = Depends(get_db)):
+@router.get("/report/{date_str}/{period}/{subject_id}/download")
+def download_attendance_report(date_str: str, period: int, subject_id: int, db: Session = Depends(get_db)):
     """Download attendance report as Excel."""
     records = db.query(AttendanceRecord).filter(
         AttendanceRecord.date == date_str,
-        AttendanceRecord.period == period
+        AttendanceRecord.period == period,
+        AttendanceRecord.subject_id == subject_id
     ).all()
 
     wb = openpyxl.Workbook()
@@ -132,4 +144,25 @@ def download_attendance_report(date_str: str, period: int, db: Session = Depends
         content=stream.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename=attendance_report_{date_str}_p{period}.xlsx"}
-    )
+    )
+
+@router.get("/student/{roll_no}")
+def get_student_attendance(roll_no: str, db: Session = Depends(get_db)):
+    """Get all attendance records for a specific student by their roll number."""
+    student = db.query(Student).filter(Student.roll_no == roll_no).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+        
+    records = db.query(AttendanceRecord, Subject).outerjoin(Subject, AttendanceRecord.subject_id == Subject.id).filter(AttendanceRecord.student_id == student.id).all()
+    
+    return {
+        "total_attendance": len(records),
+        "records": [
+            {
+                "date": r.AttendanceRecord.date,
+                "period": r.AttendanceRecord.period,
+                "marked_at": str(r.AttendanceRecord.marked_at),
+                "subject_name": r.Subject.name if r.Subject else "Unknown"
+            } for r in records
+        ]
+    }

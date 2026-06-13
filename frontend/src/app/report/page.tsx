@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { getAttendanceReport, API_BASE } from "@/lib/api";
-import type { AttendanceRecord } from "@/lib/types";
+import { useState, useEffect } from "react";
+import { getAttendanceReport, API_BASE, getBranches, getSubjects } from "@/lib/api";
+import type { AttendanceRecord, Branch, Subject } from "@/lib/types";
 
 export default function ReportPage() {
   const today = new Date().toISOString().split("T")[0];
@@ -12,11 +12,32 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
 
+  // New states for academic filters
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [branchId, setBranchId] = useState<number | "">("");
+  const [semester, setSemester] = useState<number | "">("");
+  const [subjectId, setSubjectId] = useState<number | "">("");
+
+  useEffect(() => {
+    getBranches().then(setBranches).catch(console.error);
+  }, []);
+
+  // Fetch subjects when branch or semester changes
+  useEffect(() => {
+    if (branchId !== "" && semester !== "") {
+      getSubjects(Number(branchId), Number(semester)).then(setSubjects).catch(console.error);
+    } else {
+      setSubjects([]);
+    }
+  }, [branchId, semester]);
+
   const handleFetch = async () => {
+    if (subjectId === "") return;
     setLoading(true);
     setFetched(false);
     try {
-      const data = await getAttendanceReport(date, period);
+      const data = await getAttendanceReport(date, period, Number(subjectId));
       setRecords(data);
     } catch {
       setRecords([]);
@@ -34,32 +55,88 @@ export default function ReportPage() {
           <span className="gradient-text">Attendance Reports</span>
         </h1>
         <p className="text-muted mt-1">
-          View attendance records by date and period
+          View attendance records by subject, date and period
         </p>
       </div>
 
       {/* Filters */}
       <div className="glass-card p-6 animate-fade-in" style={{ animationDelay: "100ms" }}>
-        <div className="flex flex-col sm:flex-row items-end gap-4">
-          <div className="flex-1 w-full">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[150px]">
+            <label className="block text-sm text-muted mb-1.5">Branch</label>
+            <select
+              className="input"
+              value={branchId}
+              onChange={(e) => {
+                setBranchId(e.target.value === "" ? "" : Number(e.target.value));
+                setSemester("");
+                setSubjectId("");
+                setFetched(false);
+              }}
+            >
+              <option value="">-- Select Branch --</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex-1 min-w-[150px]">
+            <label className="block text-sm text-muted mb-1.5">Semester</label>
+            <select
+              className="input"
+              value={semester}
+              onChange={(e) => {
+                setSemester(e.target.value === "" ? "" : Number(e.target.value));
+                setSubjectId("");
+                setFetched(false);
+              }}
+              disabled={branchId === ""}
+            >
+              <option value="">-- Select Semester --</option>
+              {Array.from({ length: branches.find(b => b.id === Number(branchId))?.total_semesters || 0 }, (_, i) => i + 1).map((s) => (
+                <option key={s} value={s}>Semester {s}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex-1 min-w-[150px]">
+            <label className="block text-sm text-muted mb-1.5">Subject</label>
+            <select
+              className="input"
+              value={subjectId}
+              onChange={(e) => {
+                setSubjectId(e.target.value === "" ? "" : Number(e.target.value));
+                setFetched(false);
+              }}
+              disabled={semester === ""}
+            >
+              <option value="">-- Select Subject --</option>
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="w-full sm:w-auto">
             <label className="block text-sm text-muted mb-1.5">Date</label>
             <input
               type="date"
               className="input"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => { setDate(e.target.value); setFetched(false); }}
             />
           </div>
-          <div className="w-full sm:w-32">
+          <div className="w-24">
             <label className="block text-sm text-muted mb-1.5">Period</label>
             <select
               className="input"
               value={period}
-              onChange={(e) => setPeriod(Number(e.target.value))}
+              onChange={(e) => { setPeriod(Number(e.target.value)); setFetched(false); }}
             >
               {[1, 2, 3, 4, 5, 6, 7, 8].map((p) => (
                 <option key={p} value={p}>
-                  Period {p}
+                  {p}
                 </option>
               ))}
             </select>
@@ -67,7 +144,7 @@ export default function ReportPage() {
           <button
             className="btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
             onClick={handleFetch}
-            disabled={loading}
+            disabled={loading || subjectId === ""}
           >
             {loading ? (
               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -108,7 +185,7 @@ export default function ReportPage() {
                     {date} — Period {period}
                   </h3>
                   <a
-                    href={`${API_BASE}/attendance/report/${date}/${period}/download`}
+                    href={`${API_BASE}/attendance/report/${date}/${period}/${subjectId}/download`}
                     className="px-3 py-1.5 rounded-lg bg-success/10 text-success text-sm font-medium hover:bg-success/20 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
